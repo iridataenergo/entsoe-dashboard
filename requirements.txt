@@ -1,0 +1,8 @@
+﻿entsoe-py
+pandas
+python-dotenv
+plotly
+notebook
+streamlit
+pyarrow
+kaleido
