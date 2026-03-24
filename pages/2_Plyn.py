@@ -56,7 +56,7 @@ with st.sidebar:
         "Rozsah dní",
         min_value=0,
         max_value=pocet_dni_celkem - 1,
-        value=(max(0, pocet_dni_celkem - 30), pocet_dni_celkem - 1),
+        value=(max(0, pocet_dni_celkem - 7), pocet_dni_celkem - 1),
         format="%d",
     )
     datum_od_slider = min_datum + timedelta(days=rozsah[0])
