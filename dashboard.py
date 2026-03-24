@@ -26,7 +26,7 @@ st.set_page_config(
     layout="wide"
 )
 
-cache_slozka = r"C:\Users\IvaRichterová\Desktop\entsoe-dashboard\data\cache"
+cache_slozka = os.path.join(os.path.dirname(__file__) if "__file__" in dir() else ".", "data", "cache")
 
 ZEME_NAZVY = {
     "CZ": "Česká republika",
