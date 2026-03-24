@@ -81,4 +81,15 @@ try:
 except Exception as e:
     print(f"  ✗ Výroba: {e}")
 
+# 4. TTF ceny plynu
+print("Stahuji TTF ceny plynu...")
+try:
+    import yfinance as yf
+    ttf = yf.download("TTF=F", period="60d", interval="1d", auto_adjust=True, progress=False)
+    ttf = ttf[["Close"]].rename(columns={"Close": "TTF_EUR_MWh"})
+    ttf.to_parquet("data/cache/ttf_plyn.parquet")
+    print(f"  ✓ TTF: {len(ttf)} hodnot")
+except Exception as e:
+    print(f"  ✗ TTF: {e}")
+
 print("\n✓ Hotovo — všechna data uložena do data/cache/")
