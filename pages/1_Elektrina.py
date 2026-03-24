@@ -2,12 +2,12 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import os
-from datetime import timedelta, date
+from datetime import timedelta
 
 MESICE = {
     1: "ledna", 2: "února", 3: "března", 4: "dubna",
     5: "května", 6: "června", 7: "července", 8: "srpna",
-    9: "září", 10: "října", 11: "listopadu", 12: "prosince"
+    9: "září", 10: "října",     11: "listopadu", 12: "prosince"
 }
 
 def format_datum(d):
@@ -26,7 +26,7 @@ st.set_page_config(
     layout="wide"
 )
 
-cache_slozka = os.path.join(os.path.dirname(__file__) if "__file__" in dir() else ".", "data", "cache")
+cache_slozka = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "cache")
 
 ZEME_NAZVY = {
     "CZ": "Česká republika",
@@ -37,7 +37,6 @@ ZEME_NAZVY = {
     "FR": "Francie",
 }
 
-# Načtení dat
 ceny = {}
 for kod in ZEME_NAZVY:
     soubor = os.path.join(cache_slozka, f"ceny_{kod}.parquet")
@@ -47,12 +46,10 @@ load_actual = pd.read_parquet(os.path.join(cache_slozka, "load_actual.parquet"))
 load_forecast = pd.read_parquet(os.path.join(cache_slozka, "load_forecast.parquet"))
 vyroba = pd.read_parquet(os.path.join(cache_slozka, "vyroba_cz.parquet"))
 
-# Rozsah dostupných dat
 min_datum = ceny["CZ"].index.min().date()
 max_datum = ceny["CZ"].index.max().date()
 pocet_dni_celkem = (max_datum - min_datum).days + 1
 
-# ── Postranní panel ──────────────────────────────────────────
 with st.sidebar:
     st.header("Nastavení")
 
@@ -62,7 +59,7 @@ with st.sidebar:
     for kod in dostupne_zeme:
         if st.checkbox(ZEME_NAZVY[kod], value=(kod == "CZ"), key=f"zeme_{kod}"):
             vybrane_zeme.append(kod)
-            
+
     if not vybrane_zeme:
         st.error("Vyber alespoň jednu zemi.")
         st.stop()
@@ -70,7 +67,6 @@ with st.sidebar:
     st.divider()
     st.caption("Vyber rozsah dat:")
 
-    # Posuvník s dvojitým táhlem — vrací (od, do) jako indexy dní
     rozsah = st.slider(
         "Rozsah dní",
         min_value=0,
@@ -79,16 +75,14 @@ with st.sidebar:
         format="%d",
     )
 
-    # Převod indexů na datumy
     datum_od_slider = min_datum + timedelta(days=rozsah[0])
     datum_do_slider = min_datum + timedelta(days=rozsah[1])
 
     st.caption("nebo zadej přesné datum:")
 
-    # Datumová pole — výchozí hodnota z posuvníku
     datum_od = st.date_input(
         "Od",
-        value=datum_od_slider,
+        value=max(min_datum, datum_od_slider),
         min_value=min_datum,
         max_value=max_datum,
     )
@@ -105,7 +99,6 @@ with st.sidebar:
 
     st.caption(f"Zobrazeno: {(datum_do - datum_od).days + 1} dní")
 
-# ── Filtrování ───────────────────────────────────────────────
 od = pd.Timestamp(datum_od, tz="Europe/Prague")
 do = pd.Timestamp(datum_do, tz="Europe/Prague") + pd.Timedelta(days=1)
 
@@ -117,11 +110,9 @@ load_actual_filtr = load_actual[(load_actual.index >= od) & (load_actual.index <
 load_forecast_filtr = load_forecast[(load_forecast.index >= od) & (load_forecast.index < do)]
 vyroba_filtr = vyroba[(vyroba.index >= od) & (vyroba.index < do)]
 
-# ── Nadpis ───────────────────────────────────────────────────
 st.title("⚡ ČR Elektro-tržní dashboard")
 st.caption(f"Zdroj dat: ENTSO-E | {format_datum(datum_od)} — {format_datum(datum_do)}")
 
-# ── Metriky ──────────────────────────────────────────────────
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Průměrná cena ČR", f"{ceny_cz.mean():.1f} EUR/MWh")
 col2.metric("Max cena ČR", f"{ceny_cz.max():.1f} EUR/MWh")
@@ -130,7 +121,6 @@ col4.metric("Hodin nad 100 EUR", f"{(ceny_cz > 100).sum()}")
 
 st.divider()
 
-# ── Graf cen ─────────────────────────────────────────────────
 st.subheader("Spotové ceny elektřiny — srovnání zemí")
 df_ceny = pd.DataFrame({
     ZEME_NAZVY[k]: filtruj(ceny[k]) for k in vybrane_zeme if k in ceny
@@ -143,7 +133,6 @@ st.plotly_chart(fig_ceny, use_container_width=True)
 
 st.divider()
 
-# ── Graf zatížení ────────────────────────────────────────────
 st.subheader("Zatížení soustavy — ČR")
 df_load = pd.DataFrame({
     "Skutečná spotřeba": load_actual_filtr["Actual Load"],
@@ -156,7 +145,6 @@ st.plotly_chart(fig_load, use_container_width=True)
 
 st.divider()
 
-# ── Graf výroby ──────────────────────────────────────────────
 st.subheader("Výroba podle zdrojů — ČR")
 vyroba_clean = vyroba_filtr.xs("Actual Aggregated", axis=1, level=1)
 nazvy = {
