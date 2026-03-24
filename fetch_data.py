@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 # Token — lokálně z .env, v GitHub Actions z proměnné prostředí
 load_dotenv()
 TOKEN = os.getenv("ENTSOE_TOKEN")
-
 if not TOKEN:
     raise ValueError("ENTSOE_TOKEN není nastaven")
 
@@ -81,15 +80,40 @@ try:
 except Exception as e:
     print(f"  ✗ Výroba: {e}")
 
-# 4. TTF ceny plynu
-print("Stahuji TTF ceny plynu...")
+# 4. TTF ceny plynu — maximální dostupná historie
+print("Stahuji TTF ceny plynu (celá historie)...")
 try:
     import yfinance as yf
-    ttf = yf.download("TTF=F", period="60d", interval="1d", auto_adjust=True, progress=False)
+    ttf = yf.download("TTF=F", period="max", interval="1d", auto_adjust=True, progress=False)
     ttf = ttf[["Close"]].rename(columns={"Close": "TTF_EUR_MWh"})
     ttf.to_parquet("data/cache/ttf_plyn.parquet")
-    print(f"  ✓ TTF: {len(ttf)} hodnot")
+    print(f"  ✓ TTF: {len(ttf)} hodnot ({ttf.index.min().date()} — {ttf.index.max().date()})")
 except Exception as e:
     print(f"  ✗ TTF: {e}")
+
+# 5. Naplněnost zásobníků plynu — GIE AGSI API (EU agregát)
+print("Stahuji naplněnost zásobníků plynu...")
+try:
+    import requests
+    # Volné API bez tokenu pro agregovaná EU data
+    url = "https://agsi.gie.eu/api"
+    params = {
+        "country": "eu",
+        "size": 300,  # posledních 300 dní
+    }
+    headers = {"x-key": os.getenv("GIE_API_KEY", "")}
+    r = requests.get(url, params=params, headers=headers, timeout=30)
+    r.raise_for_status()
+    data = r.json()
+    df_agsi = pd.DataFrame(data["data"])
+    df_agsi["gasDayStart"] = pd.to_datetime(df_agsi["gasDayStart"])
+    df_agsi = df_agsi.set_index("gasDayStart").sort_index()
+    # Ponecháme klíčové sloupce
+    sloupce = [c for c in ["full", "trend", "injection", "withdrawal", "workingGasVolume"] if c in df_agsi.columns]
+    df_agsi = df_agsi[sloupce].apply(pd.to_numeric, errors="coerce")
+    df_agsi.to_parquet("data/cache/zasobniky_eu.parquet")
+    print(f"  ✓ Zásobníky EU: {len(df_agsi)} hodnot")
+except Exception as e:
+    print(f"  ✗ Zásobníky EU: {e}")
 
 print("\n✓ Hotovo — všechna data uložena do data/cache/")
