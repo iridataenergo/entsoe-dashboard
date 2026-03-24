@@ -1,5 +1,5 @@
 ﻿.env
-data/cache/
+data/cache/*.csv
 __pycache__/
 .ipynb_checkpoints/
 exports/
