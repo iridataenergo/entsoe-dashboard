@@ -113,9 +113,9 @@ st.divider()
 # Metriky
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Poslední cena TTF", f"{posledni:.2f} EUR/MWh", delta=zmena_delta)
-col2.metric("Průměr za období", f"{ttf_filtr.mean():.2f} EUR/MWh")
-col3.metric("Maximum za období", f"{ttf_filtr.max():.2f} EUR/MWh")
-col4.metric("Minimum za období", f"{ttf_filtr.min():.2f} EUR/MWh")
+col2.metric("Průměr za období", f"{float(ttf_filtr.mean()):.2f} EUR/MWh")
+col3.metric("Maximum za období", f"{float(ttf_filtr.max()):.2f} EUR/MWh")
+col4.metric("Minimum za období", f"{float(ttf_filtr.min()):.2f} EUR/MWh")
 
 st.divider()
 
@@ -126,10 +126,11 @@ fig_ttf = px.line(
     labels={"value": "EUR/MWh", "index": "Datum"},
 )
 fig_ttf.update_traces(name="TTF cena")
+prumer = float(ttf_filtr.mean())
 fig_ttf.add_hline(
-    y=ttf_filtr.mean(),
+    y=prumer,
     line_dash="dash",
-    annotation_text=f"průměr {ttf_filtr.mean():.2f} EUR/MWh"
+    annotation_text=f"průměr {prumer:.2f} EUR/MWh"
 )
 fig_ttf = cz_osa_x(fig_ttf)
 st.plotly_chart(fig_ttf, use_container_width=True)
