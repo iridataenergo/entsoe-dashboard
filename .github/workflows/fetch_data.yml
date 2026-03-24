@@ -22,7 +22,7 @@ jobs:
           python-version: '3.11'
 
       - name: Instaluj zavislosti
-        run: pip install entsoe-py pandas pyarrow python-dotenv
+        run: pip install entsoe-py pandas pyarrow python-dotenv yfinance
 
       - name: Stahni data z ENTSO-E
         env:
