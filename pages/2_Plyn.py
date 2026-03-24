@@ -50,26 +50,18 @@ pocet_dni_celkem = (max_datum - min_datum).days + 1
 with st.sidebar:
     st.header("Nastavení")
 
-    # 1. Aktuální období (dny)
-    st.caption("📅 Aktuální období:")
-    rozsah = st.slider(
-        "Rozsah dní",
-        min_value=0,
-        max_value=pocet_dni_celkem - 1,
-        value=(max(0, pocet_dni_celkem - 7), pocet_dni_celkem - 1),
-        format="%d",
+    # 1. Aktuální období (max 30 dní zpět)
+    st.caption("📅 Aktuální období (max 30 dní):")
+    dni_zpet = st.slider(
+        "Počet dní zpět",
+        min_value=1,
+        max_value=30,
+        value=7,
+        format="%d dní",
     )
-    datum_od_slider = min_datum + timedelta(days=rozsah[0])
-    datum_do_slider = min_datum + timedelta(days=rozsah[1])
-
-    st.caption("nebo zadej přesné datum:")
-    datum_od = st.date_input("Od", value=datum_od_slider, min_value=min_datum, max_value=max_datum)
-    datum_do = st.date_input("Do", value=datum_do_slider, min_value=min_datum, max_value=max_datum)
-
-    if datum_od > datum_do:
-        st.error("Datum Od musí být před datem Do.")
-        st.stop()
-    st.caption(f"Zobrazeno: {(datum_do - datum_od).days + 1} dní")
+    datum_do = max_datum
+    datum_od = max_datum - timedelta(days=dni_zpet - 1)
+    st.caption(f"Od: {format_datum(datum_od)} — Do: {format_datum(datum_do)}")
 
     st.divider()
 
