@@ -87,15 +87,13 @@ do = pd.Timestamp(datum_do) + pd.Timedelta(days=1)
 ttf_filtr = ttf[(ttf.index >= od) & (ttf.index < do)]["TTF_EUR_MWh"]
 
 # Změna oproti předchozímu dni
-posledni = ttf_filtr.iloc[-1]
-predposledni = ttf_filtr.iloc[-2] if len(ttf_filtr) >= 2 else None
+posledni = float(ttf_filtr.iloc[-1])
+predposledni = float(ttf_filtr.iloc[-2]) if len(ttf_filtr) >= 2 else None
 if predposledni is not None and predposledni != 0:
     zmena_pct = (posledni - predposledni) / predposledni * 100
-    zmena_text = f"{zmena_pct:+.2f} %"
-    zmena_delta = zmena_text
+    zmena_delta = f"{zmena_pct:+.2f} %"
 else:
     zmena_delta = None
-    zmena_text = "N/A"
 
 # Hlavička
 st.title("🔥 Evropský trh s plynem — TTF")
