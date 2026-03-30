@@ -2,6 +2,7 @@ import os
 import pandas as pd
 from entsoe import EntsoePandasClient
 from dotenv import load_dotenv
+import time
 
 # Token — lokálně z .env, v GitHub Actions z proměnné prostředí
 load_dotenv()
@@ -115,5 +116,101 @@ try:
     print(f"  ✓ Zásobníky EU: {len(df_agsi)} hodnot")
 except Exception as e:
     print(f"  ✗ Zásobníky EU: {e}")
+
+# 6. SVR — Služby výkonovej rovnováhy (Slovensko)
+print("Stahuji SVR data pro Slovensko...")
+
+SK = ZEME["SK"]
+SVR_SOUBORY = {
+    "aktivace": "data/cache/svr_aktivace_sk.parquet",
+    "imbalance_ceny": "data/cache/svr_imbalance_ceny_sk.parquet",
+    "imbalance_objemy": "data/cache/svr_imbalance_objemy_sk.parquet",
+}
+
+# Výchozí start — 1.1.2025, nebo poslední datum v existujícím souboru
+SVR_VYCHOZI_START = pd.Timestamp("2025-01-01", tz="UTC")
+
+
+def svr_posledni_datum(soubor):
+    """Vrátí poslední datum v parquet souboru, nebo None pokud neexistuje."""
+    if os.path.exists(soubor):
+        df = pd.read_parquet(soubor)
+        if len(df) > 0:
+            idx = df.index.max()
+            if idx.tzinfo is None:
+                idx = idx.tz_localize("UTC")
+            return idx
+    return None
+
+
+def svr_uloz_inkrementalne(soubor, nova_data):
+    """Přidá nová data k existujícímu parquet souboru bez duplikátů."""
+    if os.path.exists(soubor):
+        existujici = pd.read_parquet(soubor)
+        sloupceno = pd.concat([existujici, nova_data])
+        sloupceno = sloupceno[~sloupceno.index.duplicated(keep="last")]
+        sloupceno.sort_index().to_parquet(soubor)
+    else:
+        nova_data.sort_index().to_parquet(soubor)
+
+
+def svr_stahni_po_mesicich(nazev, soubor, fetch_fn):
+    """Stáhne data po měsících od posledního data v souboru do teď."""
+    posledni = svr_posledni_datum(soubor)
+    if posledni is not None:
+        start = posledni + pd.Timedelta(hours=1)
+    else:
+        start = SVR_VYCHOZI_START
+
+    konec_svr = pd.Timestamp.now(tz="UTC").floor("h")
+
+    if start >= konec_svr:
+        print(f"  ⏭ {nazev}: data jsou aktuální")
+        return
+
+    # Stahuj po měsících
+    mesic_start = start
+    celkem = 0
+    while mesic_start < konec_svr:
+        mesic_konec = min(mesic_start + pd.DateOffset(months=1), konec_svr)
+        try:
+            data = fetch_fn(mesic_start, mesic_konec)
+            if data is not None and len(data) > 0:
+                if isinstance(data, pd.Series):
+                    data = data.to_frame()
+                if data.index.tz is not None:
+                    data.index = data.index.tz_convert("Europe/Prague")
+                else:
+                    data.index = data.index.tz_localize("UTC").tz_convert("Europe/Prague")
+                svr_uloz_inkrementalne(soubor, data)
+                celkem += len(data)
+        except Exception as e:
+            print(f"  ⚠ {nazev} ({mesic_start.strftime('%Y-%m')}): {e}")
+        mesic_start = mesic_konec
+        time.sleep(2)
+
+    print(f"  ✓ {nazev}: {celkem} nových hodnot")
+
+
+# 6a. Ceny aktivované vyvažovací energie
+svr_stahni_po_mesicich(
+    "Aktivovaná energie",
+    SVR_SOUBORY["aktivace"],
+    lambda s, e: client.query_activated_balancing_energy_prices(SK, start=s, end=e),
+)
+
+# 6b. Ceny nerovnováhy
+svr_stahni_po_mesicich(
+    "Ceny nerovnováhy",
+    SVR_SOUBORY["imbalance_ceny"],
+    lambda s, e: client.query_imbalance_prices(SK, start=s, end=e),
+)
+
+# 6c. Objemy nerovnováhy
+svr_stahni_po_mesicich(
+    "Objemy nerovnováhy",
+    SVR_SOUBORY["imbalance_objemy"],
+    lambda s, e: client.query_imbalance_volumes(SK, start=s, end=e),
+)
 
 print("\n✓ Hotovo — všechna data uložena do data/cache/")
