@@ -36,6 +36,8 @@ if not os.path.exists(soubor_ttf):
     st.stop()
 
 ttf = pd.read_parquet(soubor_ttf)
+if isinstance(ttf.columns, pd.MultiIndex):
+    ttf.columns = ttf.columns.get_level_values(0)
 ttf.index = pd.to_datetime(ttf.index)
 if ttf.index.tz is not None:
     ttf.index = ttf.index.tz_localize(None)
