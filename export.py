@@ -37,12 +37,17 @@ def _generuj_xlsx(datasety: dict[str, pd.DataFrame]) -> bytes:
             df_clean = _tz_strip(df)
             df_clean.to_excel(writer, sheet_name=sheet_name)
 
-            # Tučné hlavičky
+            # Tučné hlavičky + formátování datumů
             ws = writer.sheets[sheet_name]
             from openpyxl.styles import Font
             bold = Font(bold=True)
             for cell in ws[1]:
                 cell.font = bold
+            # Český formát datumů pro datetime sloupce
+            for row in ws.iter_rows(min_row=2):
+                for cell in row:
+                    if isinstance(cell.value, (pd.Timestamp, datetime)):
+                        cell.number_format = "DD.MM.YYYY HH:MM"
 
     return buf.getvalue()
 
@@ -189,6 +194,9 @@ def render_export_sidebar(
     """
     prefix = nazev_stranky.replace(" ", "_")
 
+    if cache_slozka is None:
+        cache_slozka = os.path.join(os.path.dirname(__file__), "data", "cache")
+
     with st.sidebar:
         st.divider()
         st.caption("📥 Export dat")
@@ -217,57 +225,39 @@ def render_export_sidebar(
                 st.warning("Vyber alespoň jeden dataset.")
                 return
 
-            # Načtení surových dat z parquet souborů
-            datasety_k_exportu = {}
+            # Ověř existenci souborů, načtení odloženo do generování
+            surove_cesty = {}
             for nazev in vybrane:
                 cesta = surova_data_soubory[nazev]
-                if not os.path.isabs(cesta) and cache_slozka:
+                if not os.path.isabs(cesta):
                     cesta = os.path.join(cache_slozka, cesta)
                 if os.path.exists(cesta):
-                    datasety_k_exportu[nazev] = pd.read_parquet(cesta)
+                    surove_cesty[nazev] = cesta
 
-            if not datasety_k_exportu:
+            if not surove_cesty:
                 st.warning("Žádná data k exportu.")
                 return
+            datasety_k_exportu = None  # marker: data se načtou až při generování
 
         # --- Rozsah dat ---
         st.caption("Rozsah exportu:")
         exp_od = st.date_input(
             "Export od",
             value=datum_od,
+            min_value=datum_od,
+            max_value=datum_do,
             key=f"{prefix}_export_od",
         )
         exp_do = st.date_input(
             "Export do",
             value=datum_do,
+            min_value=datum_od,
+            max_value=datum_do,
             key=f"{prefix}_export_do",
         )
 
         if exp_od > exp_do:
             st.error("Datum Od musí být před datem Do.")
-            return
-
-        # Filtruj datasety podle zvoleného rozsahu
-        ts_od = pd.Timestamp(exp_od)
-        ts_do = pd.Timestamp(exp_do) + pd.Timedelta(days=1)
-
-        datasety_final = {}
-        for nazev, df in datasety_k_exportu.items():
-            idx = df.index
-            # Sjednoť tz pro porovnání
-            if hasattr(idx, "tz") and idx.tz is not None:
-                ts_od_cmp = ts_od.tz_localize(str(idx.tz)) if ts_od.tz is None else ts_od
-                ts_do_cmp = ts_do.tz_localize(str(idx.tz)) if ts_do.tz is None else ts_do
-            else:
-                ts_od_cmp = ts_od.tz_localize(None) if ts_od.tz is not None else ts_od
-                ts_do_cmp = ts_do.tz_localize(None) if ts_do.tz is not None else ts_do
-            mask = (idx >= ts_od_cmp) & (idx < ts_do_cmp)
-            df_slice = df[mask]
-            if len(df_slice) > 0:
-                datasety_final[nazev] = df_slice
-
-        if not datasety_final:
-            st.warning("Žádná data ve zvoleném rozsahu.")
             return
 
         # --- Formát ---
@@ -281,31 +271,69 @@ def render_export_sidebar(
             key=f"{prefix}_export_format",
         )
 
+        # --- Pomocná funkce: načti a filtruj datasety ---
+        def _priprav_datasety() -> dict[str, pd.DataFrame]:
+            ts_od = pd.Timestamp(exp_od)
+            ts_do = pd.Timestamp(exp_do) + pd.Timedelta(days=1)
+
+            if je_filtrovana:
+                zdroj = datasety_k_exportu
+            else:
+                # Deferred loading surových dat
+                zdroj = {}
+                for nazev, cesta in surove_cesty.items():
+                    zdroj[nazev] = pd.read_parquet(cesta)
+
+            vysledek = {}
+            for nazev, df in zdroj.items():
+                idx = df.index
+                # Non-datetime index (e.g. string) → include as-is
+                if not isinstance(idx, pd.DatetimeIndex):
+                    if len(df) > 0:
+                        vysledek[nazev] = df
+                    continue
+                if hasattr(idx, "tz") and idx.tz is not None:
+                    ts_od_cmp = ts_od.tz_localize(str(idx.tz)) if ts_od.tz is None else ts_od
+                    ts_do_cmp = ts_do.tz_localize(str(idx.tz)) if ts_do.tz is None else ts_do
+                else:
+                    ts_od_cmp = ts_od.tz_localize(None) if ts_od.tz is not None else ts_od
+                    ts_do_cmp = ts_do.tz_localize(None) if ts_do.tz is not None else ts_do
+                mask = (idx >= ts_od_cmp) & (idx < ts_do_cmp)
+                df_slice = df[mask]
+                if len(df_slice) > 0:
+                    vysledek[nazev] = df_slice
+            return vysledek
+
         # --- Generování a stažení ---
         datum_od_str = exp_od.strftime("%Y%m%d")
         datum_do_str = exp_do.strftime("%Y%m%d")
         base_name = f"{nazev_stranky}_{datum_od_str}_{datum_do_str}"
 
         if format_export == "XLSX":
+            datasety_final = _priprav_datasety()
+            if not datasety_final:
+                st.warning("Žádná data ve zvoleném rozsahu.")
+                return
             data_bytes = _generuj_xlsx(datasety_final)
-            file_name = f"{base_name}.xlsx"
-            mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             st.download_button(
                 "⬇️ Stáhnout XLSX",
                 data=data_bytes,
-                file_name=file_name,
-                mime=mime,
+                file_name=f"{base_name}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key=f"{prefix}_dl_xlsx",
             )
 
         elif format_export == "CSV":
+            datasety_final = _priprav_datasety()
+            if not datasety_final:
+                st.warning("Žádná data ve zvoleném rozsahu.")
+                return
             data_bytes, ext = _generuj_csv(datasety_final)
-            file_name = f"{base_name}.{ext}"
             mime = "text/csv" if ext == "csv" else "application/zip"
             st.download_button(
                 "⬇️ Stáhnout CSV" if ext == "csv" else "⬇️ Stáhnout ZIP (CSV)",
                 data=data_bytes,
-                file_name=file_name,
+                file_name=f"{base_name}.{ext}",
                 mime=mime,
                 key=f"{prefix}_dl_csv",
             )
@@ -315,12 +343,11 @@ def render_export_sidebar(
                 st.warning("Žádné grafy k exportu.")
                 return
             data_bytes, ext = _generuj_png(grafy, nazvy_grafu)
-            file_name = f"{base_name}.{ext}"
             mime = "image/png" if ext == "png" else "application/zip"
             st.download_button(
                 "⬇️ Stáhnout PNG" if ext == "png" else "⬇️ Stáhnout ZIP (PNG)",
                 data=data_bytes,
-                file_name=file_name,
+                file_name=f"{base_name}.{ext}",
                 mime=mime,
                 key=f"{prefix}_dl_png",
             )
@@ -332,11 +359,10 @@ def render_export_sidebar(
             data_bytes = _generuj_pdf(
                 grafy, nazvy_grafu, nazev_stranky, exp_od, exp_do
             )
-            file_name = f"{base_name}.pdf"
             st.download_button(
                 "⬇️ Stáhnout PDF",
                 data=data_bytes,
-                file_name=file_name,
+                file_name=f"{base_name}.pdf",
                 mime="application/pdf",
                 key=f"{prefix}_dl_pdf",
             )

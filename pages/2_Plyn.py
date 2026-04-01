@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.express as px
 import os
 from datetime import timedelta
+from export import render_export_sidebar
 
 MESICE = {
     1: "ledna", 2: "února", 3: "března", 4: "dubna",
@@ -194,3 +195,21 @@ fig_sezon.update_traces(texttemplate="%{text:.1f}", textposition="outside")
 fig_sezon.update_coloraxes(showscale=False)
 st.caption("Průměr přes celou dostupnou historii dat")
 st.plotly_chart(fig_sezon, use_container_width=True)
+
+# --- Export ---
+render_export_sidebar(
+    nazev_stranky="Plyn",
+    filtrovana_data={
+        "TTF aktuální": ttf_filtr.to_frame(name="EUR/MWh"),
+        "TTF historický": ttf_hist.to_frame(name="EUR/MWh"),
+        "Roční průměry": rocni.set_index("Rok"),
+        "Sezónnost": mesicni.set_index("Název"),
+    },
+    surova_data_soubory={
+        "TTF plyn": "ttf_plyn.parquet",
+    },
+    grafy=[fig_akt, fig_hist, fig_rocni, fig_sezon],
+    nazvy_grafu=["TTF aktuální", "TTF historický", "Roční průměry", "Sezónnost"],
+    datum_od=datum_od,
+    datum_do=datum_do,
+)
