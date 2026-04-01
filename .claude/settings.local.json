@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git pull:*)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git stash:*)",
+      "Bash(git push:*)",
+      "Bash(git remote:*)",
+      "Bash(python -c \":*)",
+      "Bash(mv \"pages/1_Elektrina.py\" \"pages/1_Elektřina.py\")",
+      "Bash(mv \"pages/3_SVR.py\" \"pages/3_SVR \\(SK\\).py\")",
+      "Bash(streamlit run:*)",
+      "Bash(pip show:*)",
+      "Bash(gh api:*)",
+      "Bash(mv \"pages/1_Elektřina.py\" \"pages/1_Elektrina.py\")",
+      "Bash(mv \"pages/3_SVR \\(SK\\).py\" \"pages/3_SVR_SK.py\")",
+      "Bash(git config:*)",
+      "Bash(git branch:*)",
+      "Bash(timeout 15 bash -c 'while [ ! -s \"\"C:\\\\Users\\\\IVARIC~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-IvaRichterov--Documents-entsoe-dashboard-entsoe-dashboard\\\\4258e5b1-2727-4183-92c6-2818d011530c\\\\tasks\\\\bf7zspcm0.output\"\" ]; do sleep 1; done; cat \"\"C:\\\\Users\\\\IVARIC~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-IvaRichterov--Documents-entsoe-dashboard-entsoe-dashboard\\\\4258e5b1-2727-4183-92c6-2818d011530c\\\\tasks\\\\bf7zspcm0.output\"\"')",
+      "Bash(git fetch:*)",
+      "Bash(git cherry-pick:*)"
+    ]
+  }
+}
