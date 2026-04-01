@@ -448,7 +448,7 @@ if imb_obj_filtr is not None and len(imb_obj_filtr) > 0:
     filtrovana["Objemy nerovnováhy"] = imb_obj_filtr
 
 render_export_sidebar(
-    nazev_stranky="SVR",
+    nazev_stranky="SVR (SK)",
     filtrovana_data=filtrovana,
     surova_data_soubory={
         "Rezervy aFRR SK": "svr_rezervy_afrr_sk.parquet",

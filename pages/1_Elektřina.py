@@ -166,7 +166,7 @@ st.plotly_chart(fig_vyroba, use_container_width=True)
 
 # --- Export ---
 render_export_sidebar(
-    nazev_stranky="Elektrina",
+    nazev_stranky="Elektřina",
     filtrovana_data={
         "Ceny elektřiny": df_ceny,
         "Zatížení soustavy": df_load,
