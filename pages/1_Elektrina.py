@@ -118,7 +118,7 @@ col1, col2, col3, col4 = st.columns(4)
 col1.metric("Průměrná cena ČR", f"{ceny_cz.mean():.1f} EUR/MWh")
 col2.metric("Max cena ČR", f"{ceny_cz.max():.1f} EUR/MWh")
 col3.metric("Min cena ČR", f"{ceny_cz.min():.1f} EUR/MWh")
-col4.metric("Hodin nad 100 EUR", f"{(ceny_cz > 100).sum()}")
+col4.metric("Hodin nad 100 EUR", f"{(ceny_cz.resample('1h').mean() > 100).sum()}")
 
 st.divider()
 
