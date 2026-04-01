@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.express as px
 import os
 from datetime import timedelta
+from export import render_export_sidebar
 
 MESICE = {
     1: "ledna", 2: "února", 3: "března", 4: "dubna",
@@ -16,7 +17,7 @@ def format_datum(d):
 def cz_osa_x(fig):
     fig.update_xaxes(tickformat="%d. %m. %Y")
     fig.update_traces(
-        hovertemplate="%{x|%d. %m. %Y}<br>%{y:.1f}<extra></extra>"
+        hovertemplate="%{x|%d. %m. %Y %H:%M}<br>%{y:.1f}<extra></extra>"
     )
     return fig
 
@@ -162,3 +163,27 @@ fig_vyroba = px.area(vyroba_clean,
     labels={"value": "MW", "index": "Čas", "variable": "Zdroj"})
 fig_vyroba = cz_osa_x(fig_vyroba)
 st.plotly_chart(fig_vyroba, use_container_width=True)
+
+# --- Export ---
+render_export_sidebar(
+    nazev_stranky="Elektrina",
+    filtrovana_data={
+        "Ceny elektřiny": df_ceny,
+        "Zatížení soustavy": df_load,
+        "Výroba podle zdrojů": vyroba_clean,
+    },
+    surova_data_soubory={
+        "Ceny CZ": "ceny_CZ.parquet",
+        "Ceny DE": "ceny_DE.parquet",
+        "Ceny AT": "ceny_AT.parquet",
+        "Ceny SK": "ceny_SK.parquet",
+        "Ceny PL": "ceny_PL.parquet",
+        "Zatížení skutečné": "load_actual.parquet",
+        "Zatížení předpověď": "load_forecast.parquet",
+        "Výroba CZ": "vyroba_cz.parquet",
+    },
+    grafy=[fig_ceny, fig_load, fig_vyroba],
+    nazvy_grafu=["Ceny elektřiny", "Zatížení soustavy", "Výroba podle zdrojů"],
+    datum_od=datum_od,
+    datum_do=datum_do,
+)
