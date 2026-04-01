@@ -1,8 +1,23 @@
 import os
+import sys
+import shutil
+import tempfile
 import pandas as pd
 from entsoe import EntsoePandasClient
 from dotenv import load_dotenv
 import time
+
+# Workaround: curl SSL fails when certifi path contains non-ASCII characters (e.g. diacritics in username)
+try:
+    import certifi
+    _cert_path = certifi.where()
+    if not _cert_path.isascii():
+        _tmp_cert = os.path.join(tempfile.gettempdir(), "cacert.pem")
+        shutil.copy2(_cert_path, _tmp_cert)
+        os.environ["CURL_CA_BUNDLE"] = _tmp_cert
+        os.environ["SSL_CERT_FILE"] = _tmp_cert
+except Exception:
+    pass
 
 # Token — lokálně z .env, v GitHub Actions z proměnné prostředí
 load_dotenv()
@@ -86,6 +101,8 @@ print("Stahuji TTF ceny plynu (celá historie)...")
 try:
     import yfinance as yf
     ttf = yf.download("TTF=F", period="max", interval="1d", auto_adjust=True, progress=False)
+    if isinstance(ttf.columns, pd.MultiIndex):
+        ttf.columns = ttf.columns.get_level_values(0)
     ttf = ttf[["Close"]].rename(columns={"Close": "TTF_EUR_MWh"})
     ttf.to_parquet("data/cache/ttf_plyn.parquet")
     print(f"  ✓ TTF: {len(ttf)} hodnot ({ttf.index.min().date()} — {ttf.index.max().date()})")
@@ -212,5 +229,33 @@ svr_stahni_po_mesicich(
     SVR_SOUBORY["imbalance_objemy"],
     lambda s, e: client.query_imbalance_volumes(SK, start=s, end=e),
 )
+
+# 6d. Zakontraktované rezervy — aFRR (A51) a mFRR (A47), denní kontrakty
+# Pozor: v ENTSO-E API je A47=mFRR, A51=aFRR, A52=FCR (entsoe-py má špatné komentáře)
+REZERVY_KONFIG = [
+    ("aFRR", "A51", "data/cache/svr_rezervy_afrr_sk.parquet"),
+    ("mFRR", "A47", "data/cache/svr_rezervy_mfrr_sk.parquet"),
+]
+
+for rez_nazev, rez_pt, rez_soubor in REZERVY_KONFIG:
+    def fetch_rezervy(s, e, pt=rez_pt):
+        prices = client.query_contracted_reserve_prices(
+            SK, process_type=pt, type_marketagreement_type="A01", start=s, end=e
+        )
+        amounts = client.query_contracted_reserve_amount(
+            SK, process_type=pt, type_marketagreement_type="A01", start=s, end=e
+        )
+        # Spojíme ceny a objemy do jednoho DataFrame
+        result = pd.DataFrame(index=prices.index)
+        for col in prices.columns:
+            result[f"{col}_Price"] = prices[col]
+            result[f"{col}_Volume"] = amounts[col]
+        return result
+
+    svr_stahni_po_mesicich(
+        f"Rezervy {rez_nazev}",
+        rez_soubor,
+        fetch_rezervy,
+    )
 
 print("\n✓ Hotovo — všechna data uložena do data/cache/")
