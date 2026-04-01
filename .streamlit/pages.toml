@@ -1,0 +1,14 @@
+[[pages]]
+path = "pages/1_Elektrina.py"
+name = "Elektřina"
+icon = "⚡"
+
+[[pages]]
+path = "pages/2_Plyn.py"
+name = "Plyn"
+icon = "🔥"
+
+[[pages]]
+path = "pages/3_SVR_SK.py"
+name = "SVR (SK)"
+icon = "⚖️"
