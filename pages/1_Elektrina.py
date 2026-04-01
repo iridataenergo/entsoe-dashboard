@@ -21,11 +21,6 @@ def cz_osa_x(fig):
     )
     return fig
 
-st.set_page_config(
-    page_title="ČR Elektro Dashboard",
-    page_icon="⚡",
-    layout="wide"
-)
 
 cache_slozka = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "cache")
 

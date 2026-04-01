@@ -94,11 +94,6 @@ def oznac_extremy(fig, df, prah_nasobek=3):
 
 
 
-st.set_page_config(
-    page_title="SVR Slovensko",
-    page_icon="⚖️",
-    layout="wide"
-)
 
 cache_slozka = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "cache")
 
